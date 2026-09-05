@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # A tag that disagrees with the manifest ships a version HACS will
+      # report incorrectly, and it is invisible until someone installs it.
+      - name: Check the tag matches the manifest version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          manifest=$(jq -r .version custom_components/panda_jetpack/manifest.json)
+          if [ "$tag" != "$manifest" ]; then
+            echo "tag is $tag but manifest.json says $manifest"
+            exit 1
+          fi
+
+      - name: Build the component zip
+        run: |
+          cd custom_components/panda_jetpack
+          zip -r ../../panda_jetpack.zip .
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: panda_jetpack.zip
+          generate_release_notes: true
