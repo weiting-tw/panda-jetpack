@@ -49,4 +49,4 @@ class JetpackEffectSelect(JetpackEntity, SelectEntity):
         return None
 
     async def async_select_option(self, option: str) -> None:
-        await self.coordinator.async_send({self._write_field: STYLES.index(option)})
+        await self.coordinator.async_set_style(self._write_field, STYLES.index(option))

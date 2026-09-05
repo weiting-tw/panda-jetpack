@@ -40,4 +40,4 @@ class JetpackButton(JetpackEntity, ButtonEntity):
         self._attr_device_class = device_class
 
     async def async_press(self) -> None:
-        await self.coordinator.async_send({self._field: 1})
+        await self.coordinator.async_action(self._field)

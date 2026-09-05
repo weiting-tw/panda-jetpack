@@ -34,19 +34,7 @@ class JetpackSpeed(JetpackEntity, NumberEntity):
 
     @property
     def native_value(self) -> float | None:
-        # Unreadable like brightness, so prefer what we last sent.
-        value = self.coordinator.optimistic.get("speed")
-        if value is None:
-            value = self.coordinator.mode_entry(self.coordinator.current_mode).get("speed")
-        return value if isinstance(value, int) else None
+        return self.coordinator.effective(self.coordinator.current_mode, "speed")
 
     async def async_set_native_value(self, value: float) -> None:
-        # This message carries no mode number and applies to whichever mode
-        # is selected -- same temperament as brightness.
-        percent = int(value)
-        self.coordinator.optimistic["speed"] = percent
-        # The device never reports this back, so a coordinator refresh will
-        # not carry it either. Without this line the slider snaps back to the
-        # old value as soon as you let go.
-        self.async_write_ha_state()
-        await self.coordinator.async_send({"rgb_info_speed": percent})
+        await self.coordinator.async_set_speed(self.coordinator.current_mode, int(value))

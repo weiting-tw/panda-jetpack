@@ -37,11 +37,8 @@ class JetpackSwitch(JetpackEntity, SwitchEntity):
         return bool(self.coordinator.settings.get(self._field))
 
     async def _set(self, value: int) -> None:
-        # These are global, but the web UI always attaches the current mode
-        # number, so do the same -- read from the device so we never write it
-        # onto a different mode.
-        await self.coordinator.async_send(
-            {"rgb_info_mode": self.coordinator.current_mode, self._field: value}
+        await self.coordinator.async_toggle(
+            self._field, value, self.coordinator.current_mode
         )
 
     async def async_turn_on(self, **kwargs: Any) -> None:

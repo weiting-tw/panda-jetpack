@@ -18,7 +18,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 import voluptuous as vol
 
 from . import JetpackConfigEntry
-from .const import H2D_STATES, MODE_H2D, MODES
+from .const import H2D_STATES, MODES
 from .entity import JetpackEntity
 
 SERVICE_SET_H2D_COLOR = "set_h2d_color"
@@ -85,15 +85,8 @@ class JetpackLight(JetpackEntity, LightEntity):
 
     @property
     def brightness(self) -> int | None:
-        # The live brightness cannot be read back, so prefer what we last
-        # sent; fall back to the stored default in list2 (which is the state
-        # right after a restart, and may not match what you can see).
-        percent = self.coordinator.optimistic.get("brightness")
+        percent = self.coordinator.effective(self.coordinator.current_mode, "brightness")
         if percent is None:
-            percent = self.coordinator.mode_entry(self.coordinator.current_mode).get(
-                "brightness"
-            )
-        if not isinstance(percent, int):
             return None
         return round(percent * 255 / 100)
 
@@ -102,23 +95,15 @@ class JetpackLight(JetpackEntity, LightEntity):
         if (effect := kwargs.get(ATTR_EFFECT)) in MODES:
             mode = MODES.index(effect)
 
-        # Mode, color and on/off fit in one message. Brightness does not: it
-        # carries no mode number and applies to whichever mode is selected, so
-        # it has to wait until the mode has actually changed.
-        members: dict[str, Any] = {"rgb_info_mode": mode, "on": 1}
-        if (rgb := kwargs.get(ATTR_RGB_COLOR)) is not None:
-            members["rgb_rgba"] = "#{:02X}{:02X}{:02X}FF".format(*rgb)
-        await self.coordinator.async_send(members)
-
+        percent = None
         if (brightness := kwargs.get(ATTR_BRIGHTNESS)) is not None:
             # HA's minimum brightness is 1, which scales to 0 -- and 0 means
             # fully dark on the device.
             percent = max(1, round(brightness * 100 / 255))
-            self.coordinator.optimistic["brightness"] = percent
-            # Same reason as number: unreadable, so write it ourselves or the
-            # UI snaps back to the old value.
-            self.async_write_ha_state()
-            await self.coordinator.async_send({"rgb_info_brightness": percent})
+
+        await self.coordinator.async_apply_light(
+            mode, rgb=kwargs.get(ATTR_RGB_COLOR), brightness=percent
+        )
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -132,24 +117,8 @@ class JetpackLight(JetpackEntity, LightEntity):
         }
 
     async def async_set_h2d_color(self, state: str, color: tuple[int, int, int]) -> None:
-        """Set one of the h2d effect's per-printer-state colors.
-
-        The device's own web UI cannot do this: in V1.0.0 it checks
-        colorButton_id==8 before attaching rgb_state_index, but h2d is 9. The
-        protocol itself is fine.
-        """
-        index = H2D_STATES.index(state)
-        await self.coordinator.async_send(
-            {
-                "rgb_info_mode": MODE_H2D,
-                "rgb_rgba": "#{:02X}{:02X}{:02X}FF".format(*color),
-                # The firmware does not range-check this (sending 3 writes to
-                # slot 2), so clamp it here.
-                "rgb_state_index": max(0, min(index, len(H2D_STATES) - 1)),
-            }
-        )
+        """Set one of the h2d effect's per-printer-state colors."""
+        await self.coordinator.async_set_h2d_color(H2D_STATES.index(state), color)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        await self.coordinator.async_send(
-            {"rgb_info_mode": self.coordinator.current_mode, "on": 0}
-        )
+        await self.coordinator.async_turn_off(self.coordinator.current_mode)
