@@ -1,0 +1,20 @@
+set_h2d_color:
+  target:
+    entity:
+      integration: panda_jetpack
+      domain: light
+  fields:
+    state:
+      required: true
+      example: printing
+      selector:
+        select:
+          options:
+            - idle
+            - printing
+            - error
+    color:
+      required: true
+      example: "[255, 0, 0]"
+      selector:
+        color_rgb:

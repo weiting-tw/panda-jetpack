@@ -1,0 +1,12 @@
+{
+  "domain": "panda_jetpack",
+  "name": "BIQU Panda Jetpack",
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://github.com/Weiting-tw/panda-jetpack",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/Weiting-tw/panda-jetpack/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

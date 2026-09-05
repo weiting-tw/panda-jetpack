@@ -1,0 +1,49 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "Enter the IP address of the Panda Jetpack.",
+        "data": { "host": "Host" }
+      }
+    },
+    "error": { "cannot_connect": "Failed to connect" },
+    "abort": { "already_configured": "Device is already configured" }
+  },
+  "entity": {
+    "button": {
+      "rgb_reset": { "name": "Reset light settings" },
+      "reset": { "name": "Restart device" }
+    },
+    "switch": {
+      "follow": { "name": "Follow printer" },
+      "warning_override": { "name": "Temperature warning override" }
+    },
+    "select": {
+      "safe_effect": {
+        "name": "Safe temperature style",
+        "state": { "static": "Static", "strobing": "Strobing" }
+      },
+      "danger_effect": {
+        "name": "Danger temperature style",
+        "state": { "static": "Static", "strobing": "Strobing" }
+      }
+    },
+    "number": { "speed": { "name": "Effect speed" } }
+  },
+  "services": {
+    "set_h2d_color": {
+      "name": "Set H2D color",
+      "description": "Set one of the three printer-status colors used by the H2D light effect. The device's own web UI cannot do this due to a firmware bug.",
+      "fields": {
+        "state": {
+          "name": "Printer state",
+          "description": "Which printer state's color to change."
+        },
+        "color": {
+          "name": "Color",
+          "description": "The RGB color to use for that state."
+        }
+      }
+    }
+  }
+}

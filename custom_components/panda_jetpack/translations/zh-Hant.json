@@ -1,0 +1,43 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "輸入 Panda Jetpack 的 IP 位址。",
+        "data": { "host": "主機" }
+      }
+    },
+    "error": { "cannot_connect": "連線失敗" },
+    "abort": { "already_configured": "這台裝置已經設定過了" }
+  },
+  "entity": {
+    "button": {
+      "rgb_reset": { "name": "重設燈光設定" },
+      "reset": { "name": "重新開機" }
+    },
+    "switch": {
+      "follow": { "name": "跟隨印表機" },
+      "warning_override": { "name": "高溫警告覆蓋" }
+    },
+    "select": {
+      "safe_effect": {
+        "name": "安全溫度樣式",
+        "state": { "static": "恒亮", "strobing": "閃爍" }
+      },
+      "danger_effect": {
+        "name": "危險溫度樣式",
+        "state": { "static": "恒亮", "strobing": "閃爍" }
+      }
+    },
+    "number": { "speed": { "name": "燈效速度" } }
+  },
+  "services": {
+    "set_h2d_color": {
+      "name": "設定 H2D 顏色",
+      "description": "設定 H2D 燈效裡三個印表機狀態各自的顏色。裝置自己的網頁介面因為韌體 bug 做不到這件事。",
+      "fields": {
+        "state": { "name": "印表機狀態", "description": "要改哪一個狀態的顏色。" },
+        "color": { "name": "顏色", "description": "該狀態要用的 RGB 顏色。" }
+      }
+    }
+  }
+}
