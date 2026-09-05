@@ -44,8 +44,27 @@
 
 ## Home Assistant
 
+### 用 HACS 安裝
+
+[![在你的 Home Assistant 開啟這個 HACS 儲存庫](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=weiting-tw&repository=panda-jetpack&category=integration)
+
+點上面的按鈕會直接在你自己的 Home Assistant 裡打開這個儲存庫，按 **Download**
+之後重啟 HA 即可。
+
+手動加的話：HACS → ⋮ →「自訂儲存庫」→ 貼上
+`https://github.com/weiting-tw/panda-jetpack`，類別選 **Integration** → 新增 →
+Download → 重啟。
+
+### 手動安裝
+
 把 `custom_components/panda_jetpack/` 複製到 `config/custom_components/`，
-重啟後在「設定 → 裝置與服務」新增 **Panda Jetpack**。
+重啟 Home Assistant。
+
+### 設定
+
+[![在你的 Home Assistant 新增這個整合](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=panda_jetpack)
+
+或者：設定 → 裝置與服務 → 新增整合 → **Panda Jetpack**，填入裝置的 IP 位址。
 
 | Entity | 對應功能 |
 |---|---|

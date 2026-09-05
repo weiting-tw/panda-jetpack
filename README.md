@@ -47,8 +47,28 @@ Host defaults to `192.168.31.142`; override with `--host` or `$JETPACK_HOST`.
 
 ## Home Assistant
 
-Copy `custom_components/panda_jetpack/` into your `config/custom_components/`,
-restart, then add **Panda Jetpack** from Settings → Devices & Services.
+### Install via HACS
+
+[![Open your Home Assistant instance and open this repository inside HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=weiting-tw&repository=panda-jetpack&category=integration)
+
+The button above opens this repository directly in your own Home Assistant.
+Click **Download**, then restart Home Assistant.
+
+Adding it by hand instead: HACS → ⋮ → **Custom repositories** → paste
+`https://github.com/weiting-tw/panda-jetpack`, category **Integration** → Add →
+Download → restart.
+
+### Install manually
+
+Copy `custom_components/panda_jetpack/` into your `config/custom_components/`
+and restart Home Assistant.
+
+### Set it up
+
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=panda_jetpack)
+
+Or: Settings → Devices & Services → Add Integration → **Panda Jetpack**. Enter
+the device's IP address.
 
 | Entity | Covers |
 |---|---|
