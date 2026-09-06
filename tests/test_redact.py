@@ -19,6 +19,17 @@ import pytest
 
 from conftest import cli, util
 
+
+def _fake(label: str) -> str:
+    """A stand-in secret, built rather than written as a literal.
+
+    Secret scanners flag credential-shaped literals, and a fixture has no
+    reason to look real -- a realistic-looking value here once tripped an alert
+    on a commit that contained nothing real. Keep these obviously fake.
+    """
+    return f"NOT-A-REAL-SECRET-{label}"
+
+
 # The two adapters at this seam. Every contract test below runs against both.
 IMPLEMENTATIONS = [
     pytest.param(cli.redact, cli._SECRET_KEYS, id="cli"),
@@ -29,21 +40,21 @@ IMPLEMENTATIONS = [
 # roots, and nested inside a list of dicts (which the device does not send
 # today, but a firmware update could).
 STATE = {
-    "wifi": {"ssid": "home-network", "password": "hunter2xyz", "scan": 0},
-    "ap": {"ssid": "Panda_Jetpack_8CBFEA611A34", "password": "apsecret1", "on": 1},
+    "wifi": {"ssid": "home-network", "password": _fake("wifi"), "scan": 0},
+    "ap": {"ssid": "Panda_Jetpack_8CBFEA611A34", "password": _fake("ap"), "on": 1},
     "sta": {"hostname": "PandaJetpack", "ip": "192.168.31.142"},
     "printer": {"name": "number 2", "sn": "01P199552400005",
-                "access_code": "12345678", "ip": "192.168.31.73"},
+                "access_code": _fake("access"), "ip": "192.168.31.73"},
     "settings": {
         "on": 1, "current_mode": 9, "follow": 0,
         "list2": [{"rgb_info_mode": 0, "rgb_rgba": "#0000FFFF", "brightness": 50}],
         "list3": [{"h2d_rgba": ["#FFFFFFFF", "#FFFFFFFF", "#FF0000FF"]}],
     },
     # A shape the device does not send today; a firmware update might.
-    "future_root": [{"label": "x", "password": "nestedsecret"}],
+    "future_root": [{"label": "x", "password": _fake("nested")}],
 }
 
-SECRETS = ("hunter2xyz", "apsecret1", "12345678", "nestedsecret")
+SECRETS = tuple(_fake(n) for n in ("wifi", "ap", "access", "nested"))
 
 
 def _walk(obj, path=()):
@@ -100,8 +111,9 @@ def test_everything_that_is_not_a_secret_is_untouched(redact, keys):
 @pytest.mark.parametrize("redact,keys", IMPLEMENTATIONS)
 def test_secrets_nested_in_lists_are_redacted(redact, keys):
     """A firmware update could put a secret somewhere new. Recursion must reach it."""
-    out = redact({"anything": [{"deep": [{"password": "leakme"}]}]})
-    assert "leakme" not in json.dumps(out)
+    buried = _fake("buried")
+    out = redact({"anything": [{"deep": [{"password": buried}]}]})
+    assert buried not in json.dumps(out)
 
 
 @pytest.mark.parametrize("redact,keys", IMPLEMENTATIONS)
@@ -127,14 +139,15 @@ def test_survives_unexpected_shapes(redact, keys):
 @pytest.mark.parametrize("redact,keys", IMPLEMENTATIONS)
 def test_covers_all_three_credentials_the_device_leaks(redact, keys):
     """Pin the actual field names, not just whatever the key list happens to hold."""
+    values = {name: _fake(name) for name in ("w", "a", "p")}
     out = redact({
-        "wifi": {"password": "a"},
-        "ap": {"password": "b"},
-        "printer": {"access_code": "c"},
+        "wifi": {"password": values["w"]},
+        "ap": {"password": values["a"]},
+        "printer": {"access_code": values["p"]},
     })
     dumped = json.dumps(out)
-    for secret in ("a", "b", "c"):
-        assert f'"{secret}"' not in dumped
+    for secret in values.values():
+        assert secret not in dumped
 
 
 def test_both_copies_cover_the_same_keys():
