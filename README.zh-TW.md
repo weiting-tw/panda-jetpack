@@ -113,6 +113,11 @@ h2d 的三個顏色以唯讀屬性呈現（`h2d_idle_color`、`h2d_printing_colo
 帶 index 會**同時**寫入 `list3[0].h2d_rgba[i]` 與 `list2[9].rgb_rgba`；不帶
 就只寫 `list2[9]`。韌體不檢查範圍 —— 送 3 會寫到位置 2。
 
+## 設計筆記
+
+CLI 與 integration 各自帶一份 WebSocket client，沒有共用。這是刻意的 ——
+見 [ADR-0001](docs/adr/0001-duplicate-the-websocket-transport.md)。
+
 ## V1.0.0 韌體的 bug
 
 網頁 UI **完全沒辦法設定 h2d 三色**，起因是三個各自獨立的 bug：

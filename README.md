@@ -122,6 +122,12 @@ Sending an index writes **both** `list3[0].h2d_rgba[i]` and `list2[9].rgb_rgba`.
 Omitting it writes only `list2[9]`. The firmware does not range-check the index
 — sending 3 writes to slot 2.
 
+## Design notes
+
+The CLI and the integration each carry their own WebSocket client rather than
+sharing one. That is deliberate — see
+[ADR-0001](docs/adr/0001-duplicate-the-websocket-transport.md).
+
 ## Firmware bugs found in V1.0.0
 
 The web UI **cannot set the h2d colors at all**, due to three separate bugs:
