@@ -1,53 +1,142 @@
-"""Credentials must never leak.
+"""Credentials must never leak. One contract, checked against both copies.
 
-/ws has no authentication and dumps three plaintext secrets on connect. This is
-the one absolute rule in the project: they must not reach a terminal, a log, an
-entity attribute, or any file. The CLI and the integration each have their own
-implementation, so both are tested.
+/ws has no authentication and dumps three plaintext secrets on connect: the
+user's WiFi password, the device's AP password, and the bound printer's access
+code. Keeping them out of terminals, logs, entity attributes and diagnostics is
+the one absolute rule in this project.
+
+There are two implementations, because the CLI must run on the stock
+interpreter and cannot import from the Home Assistant tree. They deliberately
+differ in what they substitute -- a visible "<redacted>" marker for a human
+reading a terminal, None for machine-read data. That cosmetic difference is
+allowed. What follows is the part that is not: the safety contract, asserted
+against both copies so neither can drift out of it.
 """
 
 import json
 
+import pytest
+
 from conftest import cli, util
 
+# The two adapters at this seam. Every contract test below runs against both.
+IMPLEMENTATIONS = [
+    pytest.param(cli.redact, cli._SECRET_KEYS, id="cli"),
+    pytest.param(util.redact, util.SECRET_KEYS, id="integration"),
+]
+
+# Shaped like a real state dump, with secrets at several depths: top-level
+# roots, and nested inside a list of dicts (which the device does not send
+# today, but a firmware update could).
 STATE = {
-    "wifi": {"ssid": "home", "password": "hunter2"},
-    "ap": {"ssid": "Panda_Jetpack_8CBFEA611A34", "password": "apsecret", "on": 1},
-    "printer": {"name": "p1", "sn": "01P199", "access_code": "12345678"},
-    "settings": {"on": 1, "list2": [{"rgb_info_mode": 0, "rgb_rgba": "#0000FFFF"}]},
+    "wifi": {"ssid": "home-network", "password": "hunter2xyz", "scan": 0},
+    "ap": {"ssid": "Panda_Jetpack_8CBFEA611A34", "password": "apsecret1", "on": 1},
+    "sta": {"hostname": "PandaJetpack", "ip": "192.168.31.142"},
+    "printer": {"name": "number 2", "sn": "01P199552400005",
+                "access_code": "12345678", "ip": "192.168.31.73"},
+    "settings": {
+        "on": 1, "current_mode": 9, "follow": 0,
+        "list2": [{"rgb_info_mode": 0, "rgb_rgba": "#0000FFFF", "brightness": 50}],
+        "list3": [{"h2d_rgba": ["#FFFFFFFF", "#FFFFFFFF", "#FF0000FF"]}],
+    },
+    # A shape the device does not send today; a firmware update might.
+    "future_root": [{"label": "x", "password": "nestedsecret"}],
 }
-SECRETS = ("hunter2", "apsecret", "12345678")
+
+SECRETS = ("hunter2xyz", "apsecret1", "12345678", "nestedsecret")
 
 
-def test_cli_redact_removes_every_secret():
-    dumped = json.dumps(cli.redact(STATE), ensure_ascii=False)
+def _walk(obj, path=()):
+    """Every (path, key, value) pair in a nested structure."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            yield path, k, v
+            yield from _walk(v, path + (k,))
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            yield from _walk(v, path + (i,))
+
+
+# -- the contract ------------------------------------------------------------
+
+@pytest.mark.parametrize("redact,keys", IMPLEMENTATIONS)
+def test_no_secret_value_survives_anywhere(redact, keys):
+    """The whole point. Serialise the result and grep it."""
+    dumped = json.dumps(redact(STATE), ensure_ascii=False)
     for secret in SECRETS:
         assert secret not in dumped
 
 
-def test_integration_redact_removes_every_secret():
-    dumped = json.dumps(util.redact(STATE), ensure_ascii=False)
-    for secret in SECRETS:
-        assert secret not in dumped
+@pytest.mark.parametrize("redact,keys", IMPLEMENTATIONS)
+def test_every_secret_key_is_still_present_but_changed(redact, keys):
+    """Redaction replaces the value; it must not drop the key.
+
+    Dropping it would hide that the device even has a password, and would make
+    the output structurally different from the device's own.
+    """
+    out = redact(STATE)
+    for _, key, value in _walk(STATE):
+        if key in keys and value:
+            found = [v for _, k, v in _walk(out) if k == key]
+            assert found, f"{key} disappeared from the output"
+            assert value not in found, f"{key} kept its original value"
 
 
-def test_redact_keeps_everything_else():
-    """Redaction must not damage anything else -- settings stay untouched."""
-    for redact in (cli.redact, util.redact):
-        out = redact(STATE)
-        assert out["settings"] == STATE["settings"]
-        assert out["ap"]["ssid"] == STATE["ap"]["ssid"]
-        assert out["printer"]["sn"] == STATE["printer"]["sn"]
+@pytest.mark.parametrize("redact,keys", IMPLEMENTATIONS)
+def test_everything_that_is_not_a_secret_is_untouched(redact, keys):
+    """Redaction must not damage the data the caller actually wants."""
+    out = redact(STATE)
+    assert out["settings"] == STATE["settings"]
+    assert out["sta"] == STATE["sta"]
+    assert out["wifi"]["ssid"] == STATE["wifi"]["ssid"]
+    assert out["wifi"]["scan"] == STATE["wifi"]["scan"]
+    assert out["ap"]["ssid"] == STATE["ap"]["ssid"]
+    assert out["ap"]["on"] == STATE["ap"]["on"]
+    assert out["printer"]["sn"] == STATE["printer"]["sn"]
+    assert out["printer"]["ip"] == STATE["printer"]["ip"]
+    assert out["future_root"][0]["label"] == "x"
 
 
-def test_redact_survives_unexpected_shapes():
-    """A firmware update adding or dropping fields must not break redaction."""
-    for redact in (cli.redact, util.redact):
-        assert redact({}) == {}
-        assert redact({"wifi": {"password": None}})["wifi"]["password"] is None
-        assert redact([{"password": "x"}])[0]["password"] != "x"
+@pytest.mark.parametrize("redact,keys", IMPLEMENTATIONS)
+def test_secrets_nested_in_lists_are_redacted(redact, keys):
+    """A firmware update could put a secret somewhere new. Recursion must reach it."""
+    out = redact({"anything": [{"deep": [{"password": "leakme"}]}]})
+    assert "leakme" not in json.dumps(out)
 
 
-def test_both_implementations_cover_the_same_keys():
-    """The two implementations are maintained separately; keep them in sync."""
+@pytest.mark.parametrize("redact,keys", IMPLEMENTATIONS)
+def test_input_is_not_mutated(redact, keys):
+    """Callers keep using the original; redaction returns a new structure."""
+    original = json.dumps(STATE, sort_keys=True)
+    redact(STATE)
+    assert json.dumps(STATE, sort_keys=True) == original
+
+
+@pytest.mark.parametrize("redact,keys", IMPLEMENTATIONS)
+def test_survives_unexpected_shapes(redact, keys):
+    """A firmware change adding or dropping fields must not break redaction."""
+    assert redact({}) == {}
+    assert redact([]) == []
+    assert redact({"wifi": {}}) == {"wifi": {}}
+    assert redact("a bare string") == "a bare string"
+    assert redact(None) is None
+    # An empty secret holds nothing to leak; both copies must still not raise.
+    redact({"wifi": {"password": ""}})
+
+
+@pytest.mark.parametrize("redact,keys", IMPLEMENTATIONS)
+def test_covers_all_three_credentials_the_device_leaks(redact, keys):
+    """Pin the actual field names, not just whatever the key list happens to hold."""
+    out = redact({
+        "wifi": {"password": "a"},
+        "ap": {"password": "b"},
+        "printer": {"access_code": "c"},
+    })
+    dumped = json.dumps(out)
+    for secret in ("a", "b", "c"):
+        assert f'"{secret}"' not in dumped
+
+
+def test_both_copies_cover_the_same_keys():
+    """The two lists are maintained separately across the packaging seam."""
     assert set(cli._SECRET_KEYS) == set(util.SECRET_KEYS)

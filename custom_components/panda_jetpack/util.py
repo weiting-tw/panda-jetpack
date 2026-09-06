@@ -18,6 +18,13 @@ from typing import Any
 # firmware issue and cannot be fixed from out here.
 SECRET_KEYS = frozenset({"password", "access_code"})
 
+# The CLI has its own copy (it must run on the stock interpreter, so it cannot
+# import from here). It substitutes a visible "<redacted>" marker because it
+# prints to a terminal; this copy is machine-read, so None is the natural
+# absent value. The substituted value is allowed to differ. The safety
+# contract -- no secret value survives, everything else is untouched -- is not,
+# and tests/test_redact.py checks that one contract against both copies.
+
 
 def redact(obj: Any) -> Any:
     """Replace secret fields with None, leaving everything else untouched."""

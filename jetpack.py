@@ -171,10 +171,24 @@ def fetch_state(host):
 # all. Printing them would only spread them into shell history and scrollback.
 _SECRET_KEYS = ("password", "access_code")
 
+# The integration has its own copy of this (the packaging seam: this script has
+# to run on the stock interpreter, so it cannot import from the Home Assistant
+# tree). The two deliberately differ in what they substitute, because their
+# audiences differ: this one prints to a terminal, where a visible marker says
+# "a secret is here and it is hidden", which null would confuse with "no
+# password set". The integration's copy is machine-read and uses None.
+#
+# What must NOT differ is the safety contract -- no secret value survives, the
+# structure is otherwise untouched -- and tests/test_redact.py checks that one
+# contract against both copies.
+_REDACTED = "<redacted>"
+
 
 def redact(obj):
     if isinstance(obj, dict):
-        return {k: ("<redacted>" if k in _SECRET_KEYS and v else redact(v))
+        # `and v` on purpose: an empty password is not a secret, and marking it
+        # redacted would imply one exists.
+        return {k: (_REDACTED if k in _SECRET_KEYS and v else redact(v))
                 for k, v in obj.items()}
     if isinstance(obj, list):
         return [redact(v) for v in obj]
